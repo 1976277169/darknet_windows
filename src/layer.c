@@ -12,6 +12,8 @@ void free_layer(layer l)
 #endif
         return;
     }
+	if (l.input_pad)  free(l.input_pad);               //add by minwenfang for im2col_cw ***************************
+	
     if(l.cweights)           free(l.cweights);
     if(l.indexes)            free(l.indexes);
     if(l.input_layers)       free(l.input_layers);

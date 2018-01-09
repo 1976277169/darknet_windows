@@ -9,6 +9,9 @@
 #define USE_LINUX  0
 
 #define SECRET_NUM -1234
+
+  
+
 extern int gpu_index;
 
 //#define GPU
@@ -110,7 +113,7 @@ typedef struct network network;
 
 struct layer;
 typedef struct layer layer;
-
+//*******************************layer***********************//
 struct layer{
     LAYER_TYPE type;
     ACTIVATION activation;
@@ -127,6 +130,7 @@ struct layer{
     int forced;
     int flipped;
     int inputs;
+	int inputs_size_pad;                           //add by minwenfang for im2col_cw*********************
     int outputs;
     int nweights;
     int nbiases;
@@ -210,8 +214,10 @@ struct layer{
     float * forgot_state;
     float * forgot_delta;
     float * state_delta;
-    float * combine_cpu;   //
-    float * combine_delta_cpu;//
+    float * combine_cpu;   
+    float * combine_delta_cpu;
+
+	float * input_pad;              //add by minwenfang for im2col_cw *********************
 
     float * concat;
     float * concat_delta;
@@ -258,7 +264,7 @@ struct layer{
     float *z_cpu;
     float *r_cpu;
     float *h_cpu;
-    float * prev_state_cpu; //
+    float * prev_state_cpu; 
 
     float *temp_cpu;   
     float *temp2_cpu;
@@ -414,7 +420,7 @@ void free_layer(layer);
 typedef enum {
     CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM
 } learning_rate_policy;
-
+//********************************networks***********************//
 typedef struct network{
     int n;
     int batch;

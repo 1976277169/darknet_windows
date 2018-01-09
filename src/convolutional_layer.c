@@ -203,6 +203,11 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
     l.outputs = l.out_h * l.out_w * l.out_c;
     l.inputs = l.w * l.h * l.c;
 
+	l.inputs_size_pad = (w + 2 * padding) * (h + 2 * padding) * c;           //add by minwenfang for im2col_cw *******************
+
+	l.input_pad = calloc((w + 2 * padding) * (h + 2 * padding) * c, sizeof(float));//add by minwenfang for im2col_cw *******************
+	//memset(l.input_pad, 0, sizeof(float)*(w + 2 * padding) * (h + 2 * padding) * c);//add by minwenfang for im2col_cw *******************
+	
     l.output = calloc(l.batch*l.outputs, sizeof(float));
     l.delta  = calloc(l.batch*l.outputs, sizeof(float));
 
@@ -444,6 +449,7 @@ void forward_convolutional_layer(convolutional_layer l, network net)
         swap_binary(&l);
         binarize_cpu(net.input, l.c*l.h*l.w*l.batch, l.binary_input);
         net.input = l.binary_input;
+
     }
 
     int m = l.n;
@@ -455,11 +461,12 @@ void forward_convolutional_layer(convolutional_layer l, network net)
     float *b = net.workspace;
     float *c = l.output;
 
+
     for(i = 0; i < l.batch; ++i){
-		printf("*******111111111111111111111\n");
-        im2col_cpu_cw(net.input, l.c, l.h, l.w, 
-                l.size, l.stride, l.pad, b);
-		printf("###########end\n");
+		//im2col 就是image to column, 就是将图像依照卷积核的大小拉伸为列向量，方便矩阵运算
+		//im2col_cpu(net.input,l.c, l.h, l.w, l.size, l.stride, l.pad, b);
+		im2col_cpu_cw(net.input, l.input_pad,l.c, l.h, l.w, l.size, l.stride, l.pad, b);
+		//gemm 这个函数实现矩阵运算，也就是卷积运算
         gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
         c += n*m;
         net.input += l.c*l.h*l.w;

@@ -47,31 +47,36 @@ void im2col_cpu(float* data_im,
     }
 }
 
-void im2col_cpu_cw(float* data_im,
+void im2col_cpu_cw(float* data_im, float* data_im_pad,
 	int channels, int height, int width,
 	int ksize, int stride, int pad, float* data_col)
 {
-	printf("**********22222\n");
 	int c, h, w;
 	int new_height = height + 2 * pad;
 	int new_width = width + 2 * pad;
-	float* new_data_im = (float*)malloc(new_height*new_width*channels*sizeof(float));
-	memset(new_data_im, 0, sizeof(float)*new_height*new_width*channels);
-
+	float new_data_im_temp[368640]; //IPV368640  APF122880
+	//float *new_data_im = (float *)malloc(new_height*new_width*channels*sizeof(float));
+	//memset(new_data_im, 0, sizeof(float)*new_width*new_height*channels);
+	
+	//printf("max = %d\n", new_width*new_height*channels);
 	int data_size = height*width;
 	int new_data_size = new_height*new_width;
-	printf("!!!!!!!!!!!!#######################\n");
-	for (c = 0; c < channels; c++)
+
+	
+
+
+	for (c = 0; c < channels; ++c)
 	{
-		for (h = 0; h < height; h++)
+		for (h = 0; h < height; ++h)
 		{
-			for (w = 0; w < width; w++)
+			for (w = 0; w < width; ++w)
 			{
-				new_data_im[(h + pad)*new_width + w + pad + c*new_data_size] = data_im[h*width + w + c*data_size];//在原图像外包一层pad
+				data_im_pad[(h + pad)*new_width + w + pad + c*new_data_size] = data_im[h*width + w + c*data_size];//在原图像外包一层pad
+				//new_data_im_temp[(h + pad)*new_width + w + pad + c*new_data_size] = *(data_im+h*width + w + c*data_size);
 			}
 		}
 	}
-	printf("!!!!!!!!!!!!new_data_im error !\n");
+
 	int channels_col = channels * ksize * ksize;
 
 	int height_col = (height + 2 * pad - ksize) / stride + 1;
@@ -92,10 +97,11 @@ void im2col_cpu_cw(float* data_im,
 				int im_col = w_offset + w*stride;
 				//int col_index = c * col_size + h * width_col + w;
 				int col_index = (c * height_col + h) * width_col + w;
-				data_col[col_index] = new_data_im[im_col + new_width*im_row + c_im*new_data_size];
+				data_col[col_index] = data_im_pad[im_col + new_width*im_row + c_im*new_data_size];
+				//*(data_col + col_index) = new_data_im_temp[im_col + new_width*im_row + c_im*new_data_size];
 			}
 		}
 	}
-	printf("********data_col error !\n");
-	free(new_data_im);
+
+	//free(new_data_im);
 }

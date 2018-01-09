@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
+#include<windows.h>
 #include "network.h"
 #include "image.h"
 #include "data.h"
@@ -203,6 +204,9 @@ network make_network(int n)
 void forward_network(network net)
 {
     int i;
+	float time1 = 3.0f;
+	float time2 = 2.0f;
+	DWORD time_temp = time2;
     for(i = 0; i < net.n; ++i){
         net.index = i;
         layer l = net.layers[i];
@@ -211,7 +215,7 @@ void forward_network(network net)
         }
 		//Sleep(10);
         l.forward(l, net);
-		//Sleep(5);
+		//Sleep(time_temp);
         net.input = l.output;
         if(l.truth) {
             net.truth = l.output;
@@ -406,6 +410,7 @@ int resize_network(network *net, int w, int h)
     free(net->input);
     free(net->truth);
     net->input = calloc(net->inputs*net->batch, sizeof(float));
+	//net->input_pad = calloc(net->inputs_)
     net->truth = calloc(net->truths*net->batch, sizeof(float));
 #ifdef GPU
     if(gpu_index >= 0){
