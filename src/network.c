@@ -205,7 +205,7 @@ void forward_network(network net)
 {
     int i;
 	float time1 = 3.0f;
-	float time2 = 2.0f;
+	float time2 = 5.0f;
 	DWORD time_temp = time2;
     for(i = 0; i < net.n; ++i){
         net.index = i;

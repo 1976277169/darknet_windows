@@ -54,7 +54,7 @@ void im2col_cpu_cw(float* data_im, float* data_im_pad,
 	int c, h, w;
 	int new_height = height + 2 * pad;
 	int new_width = width + 2 * pad;
-	float new_data_im_temp[368640]; //IPV368640  APF122880
+	//float new_data_im_temp[368640]; //IPV368640  APF122880
 	//float *new_data_im = (float *)malloc(new_height*new_width*channels*sizeof(float));
 	//memset(new_data_im, 0, sizeof(float)*new_width*new_height*channels);
 	
