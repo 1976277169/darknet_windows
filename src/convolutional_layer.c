@@ -464,8 +464,8 @@ void forward_convolutional_layer(convolutional_layer l, network net)
 
     for(i = 0; i < l.batch; ++i){
 		//im2col 就是image to column, 就是将图像依照卷积核的大小拉伸为列向量，方便矩阵运算
-		//im2col_cpu(net.input,l.c, l.h, l.w, l.size, l.stride, l.pad, b);
-		im2col_cpu_cw(net.input, l.input_pad,l.c, l.h, l.w, l.size, l.stride, l.pad, b);
+		im2col_cpu(net.input,l.c, l.h, l.w, l.size, l.stride, l.pad, b);
+		//im2col_cpu_cw(net.input, l.input_pad,l.c, l.h, l.w, l.size, l.stride, l.pad, b);
 		//gemm 这个函数实现矩阵运算，也就是卷积运算
         gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
         c += n*m;
