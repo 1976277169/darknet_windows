@@ -160,7 +160,25 @@ int entry_index(layer l, int batch, int location, int entry)
     int loc = location % (l.w*l.h);
     return batch*l.outputs + n*l.w*l.h*(l.coords+l.classes+1) + entry*l.w*l.h + loc;
 }
-
+/**
+* @param l
+* @param net
+* @details 本函数多次调用了entry_index()函数，且使用的参数不尽相同，尤其是最后一个参数，通过最后一个参数，
+*          可以确定出region_layer输出l.output的数据存储方式。为方便叙述，假设本层输出参数l.w = 2, l.h= 3,
+*          l.n = 2, l.classes = 2, l.coords = 4, l.c = l.n * (l.coords + l.classes + 1) = 21,
+*          l.output中存储了所有矩形框的信息参数，每个矩形框包括4条定位信息参数x,y,w,h，一条自信度（confidience）
+*          参数c，以及所有类别的概率C1,C2（本例中，假设就只有两个类别，l.classes=2），那么一张样本图片最终会有
+*          l.w*l.h*l.n个矩形框（l.w*l.h即为最终图像划分层网格的个数，每个网格预测l.n个矩形框），那么
+*          l.output中存储的元素个数共有l.w*l.h*l.n*(l.coords + 1 + l.classes)，这些元素全部拉伸成一维数组
+*          的形式存储在l.output中，存储的顺序为：
+*          xxxxxx-yyyyyy-wwwwww-hhhhhh-cccccc-C1C1C1C1C1C1C2C2C2C2C2C2-##-xxxxxx-yyyyyy-wwwwww-hhhhhh-cccccc-C1C2C1C2C1C2C1C2C1C2C1C2
+*          文字说明如下：-##-隔开分成两段，左右分别是代表所有网格的第1个box和第2个box（因为l.n=2，表示每个网格预测两个box），
+*          总共有l.w*l.h个网格，且存储时，把所有网格的x,y,w,h,c信息聚到一起再拼接起来，因此xxxxxx及其他信息都有l.w*l.h=6个，
+*          因为每个有l.classes个物体类别，而且也是和xywh一样，每一类都集中存储，先存储l.w*l.h=6个C1类，而后存储6个C2类，
+*         更为具体的注释可以函数中的语句注释（注意不是C1C2C1C2C1C2C1C2C1C2C1C2的模式，而是将所有的类别拆开分别集中存储）。
+* @details 自信度参数c表示的是该矩形框内存在物体的概率，而C1，C2分别表示矩形框内存在物体时属于物体1和物体2的概率，
+*          因此c*C1即得矩形框内存在物体1的概率，c*C2即得矩形框内存在物体2的概率
+*/
 void forward_region_layer(const layer l, network net)
 {
     int i,j,b,t,n;
@@ -190,7 +208,10 @@ void forward_region_layer(const layer l, network net)
 #endif
 
     memset(l.delta, 0, l.outputs * l.batch * sizeof(float));
+	// 如果不是训练过程，则返回不再执行下面的语句
+	//（前向推理即检测过程也会调用这个函数，这时就不需要执行下面训练时才会用到的语句了）
     if(!net.train) return;
+
     float avg_iou = 0;
     float recall = 0;
     float avg_cat = 0;
@@ -203,10 +224,18 @@ void forward_region_layer(const layer l, network net)
         if(l.softmax_tree)
 		{
             int onlyclass = 0;
-            for(t = 0; t < 30; ++t)
-			{
+            for(t = 0; t < 30; ++t)// 循环30次，每张图片固定最多处理30个矩形框
+			{// 通过移位来获取每一个真实矩形框的信息，net.truth存储了网络吞入的所有图片的真实矩形框信息
+				//（一次吞入一个batch的训练图片），
+				// net.truth作为这一个大数组的首地址，l.truths参数是每一张图片含有的
+				//真实值参数个数（可参考layer.h中的truths参数中的注释）
+				// b是batch中已经处理完图片的图片的张数，l.coords + 1是每个真实矩形框需要几个参数值（也即每条矩形框真值有5个参数），t是本张图片已经处理
                 box truth = float_to_box(net.truth + t*(l.coords + 1) + b*l.truths, 1);
+				// 这个if语句是用来判断一下是否有读到真实矩形框值（每个矩形框有5个参数,float_to_box只读取其中的4个定位参数，
+				/// 只要验证x的值不为0,那肯定是4个参数值都读取到了，要么全部读取到了，要么一个也没有），另外，因为程序中写死了每张图片处理30个矩形框，
+				/// 那么有些图片没有这么多矩形框，就会出现没有读到的情况。
                 if(!truth.x) break;
+
                 int class = net.truth[t*(l.coords + 1) + b*l.truths + l.coords];
                 float maxp = 0;
                 int maxi = 0;
@@ -235,24 +264,46 @@ void forward_region_layer(const layer l, network net)
             }
             if(onlyclass) continue;
         }
+
+		/**
+		* 下面三层主循环的顺序，与最后一层输出的存储方式有关。外层循环遍历所有行，中层循环遍历所有列，这两层循环合在一起就是按行遍历
+		* region_layer输出中的每个网格，内层循环l.n表示的是每个grid cell中预测的box数目。首先要明白这一点，region_layer层的l.w,l.h
+		* 就是指最后图片划分的网格（grid cell）数，也就是说最后一层输出的图片被划分成了l.w*l.h个网格，每个网格中预测l.n个矩形框
+		* （box），每个矩形框就是一个潜在的物体，每个矩形框中包含了矩形框定位信息x,y,w,h，含有物体的自信度信息c，以及属于各类的概率，
+		* 最终该网格挑出概率最大的作为该网格中含有的物体，当然最终还需要检测，如果其概率没有超过一定阈值，那么判定该网格中不含物体。
+		* 搞清楚这点之后，理解下面三层循环就容易一些了，外面两层循环是在遍历每一个网格，内层循环则遍历每个网格中预测的所有box。
+		* 除了这三层主循环之后，里面还有一个循环，循环次数固定为30次，这个循环是遍历一张训练图片中30个真实的矩形框（30是指定的一张训练
+		* 图片中最多能够拥有的真实矩形框个数）。知道了每一层在遍历什么，那么这整个4层循环合起来是用来干什么的呢？与紧跟着这4层循环之后
+		* 还有一个固定30次的循环在功能上有什么区别呢？此处这四层循环目的在于
+		*/
         for (j = 0; j < l.h; ++j) {
             for (i = 0; i < l.w; ++i) {
                 for (n = 0; n < l.n; ++n) {
+					/// 根据i,j,n计算该矩形框的索引，实际是矩形框中存储的x参数在l.output中的索引，矩形框中包含多个参数，x是其存储的首个参数，
+					/// 所以也可以说是获取该矩形框的首地址。更为详细的注释，参考entry_index()的注释。
                     int box_index = entry_index(l, b, n*l.w*l.h + j*l.w + i, 0);
-                    box pred = get_region_box(l.output, l.biases, n, box_index, i, j, l.w, l.h, l.w*l.h);
+                    box pred = get_region_box(l.output, l.biases, n, box_index, i, j, l.w, l.h, l.w*l.h);// 根据矩形框的索引，获取矩形框的定位信息
                     float best_iou = 0;
                     for(t = 0; t < 30; ++t){
                         box truth = float_to_box(net.truth + t*(l.coords + 1) + b*l.truths, 1);
-                        if(!truth.x) break;
+
+                        if(!truth.x) break;//
+
                         float iou = box_iou(pred, truth);
                         if (iou > best_iou) {
                             best_iou = iou;
                         }
                     }
+					// 获取当前遍历矩形框含有物体的置信度信息c（该矩形框中的确存在物体的概率）在l.output中的索引值
                     int obj_index = entry_index(l, b, n*l.w*l.h + j*l.w + i, l.coords);
                     avg_anyobj += l.output[obj_index];
                     l.delta[obj_index] = l.noobject_scale * (0 - l.output[obj_index]);
-                    if(l.background) l.delta[obj_index] = l.noobject_scale * (1 - l.output[obj_index]);
+					if (l.background){
+						l.delta[obj_index] = l.noobject_scale * (1 - l.output[obj_index]);
+
+					}
+						
+
                     if (best_iou > l.thresh) {
                         l.delta[obj_index] = 0;
                     }

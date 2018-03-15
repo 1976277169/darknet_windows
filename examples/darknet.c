@@ -408,7 +408,7 @@ int main(int argc, char **argv)
 #if 1
 	argc = 7;
 	argv[1] = "detector";
-	argv[2] = "test";
+	argv[2] = "train";
 	argv[3] = "ipv.data";
 	argv[4] = "ipv.cfg";
 	argv[5] = "ipv.weights";
