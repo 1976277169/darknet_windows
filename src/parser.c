@@ -710,7 +710,7 @@ network parse_network_cfg(char *filename)
             l = parse_route(options, params, net);
         }else if(lt == SHORTCUT){
             l = parse_shortcut(options, params, net);
-        }else if(lt == DROPOUT){
+        }else if(lt == DROPOUT){//声明dropout层时，直接制定了其输出层的内存地址是上一层的输出地址
             l = parse_dropout(options, params);
             l.output = net.layers[count-1].output;
             l.delta = net.layers[count-1].delta;
